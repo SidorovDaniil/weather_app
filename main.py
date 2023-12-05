@@ -2,7 +2,7 @@ import requests
 import geocoder
 import pandas as pd
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 API_KEY = 'b9223c17622bebeec90cc05201230585'
 LINK = 'https://api.openweathermap.org/data/2.5/weather?units=metric&lang=ru&q={}&appid={}'
@@ -15,10 +15,10 @@ TEXT_OF_INTERFACE = "Что вы хотите узнать?\n" \
                     "Введите '5' чтобы выйти из программы\n"
 
 TEXT_OF_WEATHER_REPORT = "Текущее время: {}\n" \
-                         "Город: {}\n" \
-                         "Температура: {}°C\n" \
-                         "Ощущается как: {}°C\n" \
-                         "Облачность: {}\n" \
+                         "Название города: {}\n" \
+                         "Погодные условия: {}\n" \
+                         "Текущая температура: {} градусов по цельсию\n" \
+                         "Ощущается как: {} градусов по цельсию\n" \
                          "Скорость ветра: {} м/с\n"
 
 
@@ -30,26 +30,37 @@ def get_weather_data_for_city(city: str) -> dict[str: any]:
     :return: словарь с погодными данными для города, введенного пользователем
     """
 
-    response = requests.get(LINK.format(city, API_KEY))
-    return response.json()
+    try:
+        response = requests.get(LINK.format(city, API_KEY))
+        return response.json()
+
+    except TimeoutError:
+        print('Превышено время ожидания ответа, попробуйте позже')
 
 
 def get_user_city() -> str:
     """
-    Определяет город пользователя по его ip
+    Определяет город пользователя по его ip адресу
 
     :return: Название города
     """
 
-    return geocoder.ip('me').city
+    try:
+        return geocoder.ip('me').city
+
+    except TimeoutError:
+        print('Превышено время ожидания ответа, попробуйте позже')
 
 
-def get_time(weather_data) -> str:
+def get_time(timestamp, timezone_seconds) -> str:
+    """
+    Функция возвращает текущее время в городе, для которого производился запрос
 
-    timestamp = weather_data['dt']
-    timezone = weather_data['timezone']
-
-    current_time = f'{datetime.fromtimestamp(timestamp)} + {timedelta(seconds=timezone)}'
+    :param timestamp: местное время в формате UNIX
+    :param timezone_seconds: сдвиг по времени в секундах от UTC
+    :return:
+    """
+    current_time = f'{datetime.fromtimestamp(timestamp, timezone(timedelta(seconds=timezone_seconds)))}'
 
     return current_time
 
@@ -58,28 +69,28 @@ def parse_weather_data(weather_data: dict[str: any]) -> dict[str: any]:
     """
     Функция парсит из словаря следующие данные:
         Текущее время current_time
-        Город, где были произведены измерения city
-        Температура temperature
+        Название города, где были произведены измерения city
+        Погодные условия cloud
+        Текущая температура temperature
         Ощущение температуры temp_feels_like
-        Облачность cloud
         Скорость ветра wind_speed
 
     :param weather_data: Словарь со всевозможными данными о погоде
     :return: Словарь с необходимыми данными
     """
 
-    current_time = get_time(weather_data)
+    current_time = get_time(weather_data['dt'], weather_data['timezone'])
     city = weather_data['name']
+    cloud = weather_data['weather'][0]['description']
     temperature = weather_data['main']['temp']
     temp_feels_like = weather_data['main']['feels_like']
-    cloud = weather_data['weather'][0]['description']
     wind_speed = weather_data['wind']['speed']
 
     useful_weather_data = {'current_time': current_time,
                            'city': city,
+                           'cloud': cloud,
                            'temp': temperature,
                            'feels_like': temp_feels_like,
-                           'cloud': cloud,
                            'wind_speed': wind_speed}
 
     return useful_weather_data
@@ -95,9 +106,9 @@ def weather_report(useful_weather_data: dict[str, any]):
 
     return TEXT_OF_WEATHER_REPORT.format(useful_weather_data['current_time'],
                                          useful_weather_data['city'],
+                                         useful_weather_data['cloud'],
                                          useful_weather_data['temp'],
                                          useful_weather_data['feels_like'],
-                                         useful_weather_data['cloud'],
                                          useful_weather_data['wind_speed'])
 
 
@@ -112,7 +123,7 @@ def create_or_read_history() -> pd.DataFrame:
     if os.path.exists('history.csv'):
         return pd.read_csv('history.csv')
 
-    return pd.DataFrame(columns=['current_time', 'city', 'temp', 'feels_like', 'cloud', 'wind_speed'])
+    return pd.DataFrame(columns=['current_time', 'city', 'cloud', 'temp', 'feels_like', 'wind_speed'])
 
 
 def write_data_to_history(weather_data: dict[str, any]) -> None:
@@ -142,10 +153,17 @@ def see_last_n_requests(number_of_requests: int) -> None:
         print('\nВыведено 0 запросов, как вы и просили\n')
 
     elif number_of_requests < 0:
-        print(f'\nЧисло n должно быть положительно\n')
+        print(f'\nЧисло запросов для вывода должно быть положительно\n')
 
-    elif number_of_requests > history.shape[0]:
-        print(f'\nВ истории нет такого количества запросов\nПопробуйте ввести число от 0 до {history.shape[0]}\n')
+    elif number_of_requests >= history.shape[0]:
+        print(f'\nВыведена вся история ({history.shape[0]} запросов)\n')
+        print('_______________________________')
+        for i in range(1, history.shape[0]+1):
+            row = history.iloc[-i, :].to_dict()
+            weather_data = weather_report(row)
+
+            print(f'{weather_data}')
+        print('_______________________________')
 
     else:
         print(f'\nВыведено {number_of_requests} запросов\n')
@@ -154,7 +172,7 @@ def see_last_n_requests(number_of_requests: int) -> None:
             row = history.iloc[-i, :].to_dict()
             weather_data = weather_report(row)
 
-            print(f'\n{weather_data}')
+            print(f'{weather_data}')
         print('_______________________________')
 
 
@@ -240,11 +258,9 @@ def interface() -> None:
             break
 
 
-
 class Exit(Exception):
     def __init__(self, message):
         super().__init__(message)
-
 
 
 interface()
