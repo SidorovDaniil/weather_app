@@ -4,8 +4,8 @@ import pandas as pd
 import os
 from datetime import datetime, timedelta, timezone
 
-API_KEY = 'b9223c17622bebeec90cc05201230585'
-LINK = 'https://api.openweathermap.org/data/2.5/weather?units=metric&lang=ru&q={}&appid={}'
+API_KEY = "b9223c17622bebeec90cc05201230585"
+LINK = "https://api.openweathermap.org/data/2.5/weather?units=metric&lang=ru&q={}&appid={}"
 
 TEXT_OF_INTERFACE = "Что вы хотите узнать?\n" \
                     "Введите '1' чтобы узнать погоду по вашему местоположению\n" \
@@ -27,7 +27,7 @@ def get_weather_data_for_city(city: str) -> dict[str: any]:
     Совершает запрос к веб сервису для определения погоды
 
     :param city: Город, погодные данные которого требуется определить
-    :return: словарь с погодными данными для города, введенного пользователем
+    :return: Словарь с погодными данными для города, введенного пользователем
     """
 
     try:
@@ -35,7 +35,7 @@ def get_weather_data_for_city(city: str) -> dict[str: any]:
         return response.json()
 
     except TimeoutError:
-        print('Превышено время ожидания ответа, попробуйте позже')
+        print("Превышено время ожидания ответа, попробуйте позже")
 
 
 def get_user_city() -> str:
@@ -49,7 +49,7 @@ def get_user_city() -> str:
         return geocoder.ip('me').city
 
     except TimeoutError:
-        print('Превышено время ожидания ответа, попробуйте позже')
+        print("Превышено время ожидания ответа, попробуйте позже")
 
 
 def get_time(timestamp, timezone_seconds) -> str:
@@ -58,9 +58,9 @@ def get_time(timestamp, timezone_seconds) -> str:
 
     :param timestamp: местное время в формате UNIX
     :param timezone_seconds: сдвиг по времени в секундах от UTC
-    :return:
+    :return: Строка, содержащая текущее время
     """
-    current_time = f'{datetime.fromtimestamp(timestamp, timezone(timedelta(seconds=timezone_seconds)))}'
+    current_time = f"{datetime.fromtimestamp(timestamp, timezone(timedelta(seconds=timezone_seconds)))}"
 
     return current_time
 
@@ -101,7 +101,7 @@ def weather_report(useful_weather_data: dict[str, any]):
     Функция формирует строку с данными о погоде
 
     :param useful_weather_data: Словарь с данными о погоде
-    :return: Отформатированная строка с данными
+    :return: Отформатированная строка с погодными данными
     """
 
     return TEXT_OF_WEATHER_REPORT.format(useful_weather_data['current_time'],
@@ -225,7 +225,7 @@ def action(user_input: int) -> None:
             print('\nВаша история пуста\n')
 
         else:
-            number_of_requests = int(input('\nВведите число запросов, которые вы хотите увидеть\n'))
+            number_of_requests = int(input('\nСколько запросов вы хотите увидеть?\n'))
             see_last_n_requests(number_of_requests)
 
     elif user_input == 4:
