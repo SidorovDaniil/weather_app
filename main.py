@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 API_KEY = "b9223c17622bebeec90cc05201230585"
-LINK = "https://api.openweathermap.org/data/2.5/weather?units=metric&lang=ru&q={}&appid={}"
+LINK = "https://api.openweathermap.org/data/2.5/weather?"
 
 TEXT_OF_INTERFACE = "Что вы хотите узнать?\n" \
                     "Введите '1' чтобы узнать погоду по вашему местоположению\n" \
@@ -31,10 +31,18 @@ def get_weather_data_for_city(city: str) -> dict[str: any]:
     """
 
     try:
-        response = requests.get(LINK.format(city, API_KEY))
+        response = requests.get(
+            LINK,
+            params={'q': city,
+                    'appid': API_KEY,
+                    'units': 'metric',
+                    'lang': 'ru'},
+            timeout=3
+        )
+
         return response.json()
 
-    except TimeoutError:
+    except requests.exceptions.RequestException:
         print("Превышено время ожидания ответа, попробуйте позже")
 
 
@@ -158,7 +166,7 @@ def see_last_n_requests(number_of_requests: int) -> None:
     elif number_of_requests >= history.shape[0]:
         print(f'\nВыведена вся история ({history.shape[0]} запросов)\n')
         print('_______________________________')
-        for i in range(1, history.shape[0]+1):
+        for i in range(1, history.shape[0] + 1):
             row = history.iloc[-i, :].to_dict()
             weather_data = weather_report(row)
 
@@ -168,7 +176,7 @@ def see_last_n_requests(number_of_requests: int) -> None:
     else:
         print(f'\nВыведено {number_of_requests} запросов\n')
         print('_______________________________')
-        for i in range(1, number_of_requests+1):
+        for i in range(1, number_of_requests + 1):
             row = history.iloc[-i, :].to_dict()
             weather_data = weather_report(row)
 
@@ -256,6 +264,9 @@ def interface() -> None:
         except Exit as error:
             print(error)
             break
+
+        except Exception:
+            print("\n")
 
 
 class Exit(Exception):
