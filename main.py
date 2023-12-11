@@ -3,6 +3,7 @@ import geocoder
 import pandas as pd
 import os
 from datetime import datetime, timedelta, timezone
+from http import HTTPStatus
 
 API_KEY = "b9223c17622bebeec90cc05201230585"
 LINK = "https://api.openweathermap.org/data/2.5/weather?"
@@ -30,20 +31,32 @@ def get_weather_data_for_city(city: str) -> dict[str: any]:
     :return: Словарь с погодными данными для города, введенного пользователем
     """
 
+    response = requests.get(
+        LINK,
+        params={'q': city,
+                'appid': API_KEY,
+                'units': 'metric',
+                'lang': 'ru'},
+        timeout=3
+    )
+
     try:
-        response = requests.get(
-            LINK,
-            params={'q': city,
-                    'appid': API_KEY,
-                    'units': 'metric',
-                    'lang': 'ru'},
-            timeout=3
-        )
+        response.raise_for_status()
 
         return response.json()
 
+    except requests.exceptions.HTTPError:
+        if response.status_code == HTTPStatus.NOT_FOUND:
+            raise HttpStatusNotFound('Города, в котором вы находитесь, нет в базе')
+
+        elif response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR:
+            raise HttpStatusServerError('Ошибка со стороны сервера, попробуйте позже')
+
+    except requests.exceptions.ConnectionError:
+        raise ConnectionError('Ошибка соединения')
+
     except requests.exceptions.RequestException:
-        print("Превышено время ожидания ответа, попробуйте позже")
+        raise VeryBadError("Что-то пошло не так, попробуйте позже")
 
 
 def get_user_city() -> str:
@@ -53,11 +66,16 @@ def get_user_city() -> str:
     :return: Название города
     """
 
-    try:
-        return geocoder.ip('me').city
+    location = geocoder.ip('me', timeout=3)
 
-    except TimeoutError:
-        print("Превышено время ожидания ответа, попробуйте позже")
+    if location.ok:
+        return location.city
+
+    elif location.status_code == 404:
+        raise GeocoderNotFound('Не удалось определить ваше местоположение')
+
+    elif location.status_code == 500:
+        raise GeocoderServerError('Ошибка при получении данных о вашем местоположении со стороны сервера')
 
 
 def get_time(timestamp, timezone_seconds) -> str:
@@ -207,12 +225,35 @@ def action(user_input: int) -> None:
     """
 
     if user_input == 1:
-        city = get_user_city()
-        all_weather_data = get_weather_data_for_city(city)
-        weather_data = parse_weather_data(all_weather_data)
-        write_data_to_history(weather_data)
 
-        print(weather_report(weather_data))
+        try:
+            city = get_user_city()
+            all_weather_data = get_weather_data_for_city(city)
+            weather_data = parse_weather_data(all_weather_data)
+            write_data_to_history(weather_data)
+
+            print(weather_report(weather_data))
+
+        except requests.exceptions.Timeout:
+            print("Превышено время ожидания ответа, попробуйте позже")
+
+        except GeocoderNotFound as error:
+            print(error)
+
+        except GeocoderServerError as error:
+            print(error)
+
+        except HttpStatusNotFound as error:
+            print(error)
+
+        except HttpStatusServerError as error:
+            print(error)
+
+        except ConnectionError as error:
+            print(error)
+
+        except VeryBadError as error:
+            print(error)
 
     elif user_input == 2:
         city = input('\nВведите название города\n').strip()
@@ -224,8 +265,20 @@ def action(user_input: int) -> None:
 
             print(weather_report(weather_data))
 
-        except KeyError:
-            print('\nВведенного города нет в базе\n')
+        except requests.exceptions.Timeout:
+            print("Превышено время ожидания ответа, попробуйте позже")
+
+        except HttpStatusNotFound as error:
+            print(error)
+
+        except HttpStatusServerError as error:
+            print(error)
+
+        except ConnectionError as error:
+            print(error)
+
+        except VeryBadError as error:
+            print(error)
 
     elif user_input == 3:
         history = create_or_read_history()
@@ -265,11 +318,41 @@ def interface() -> None:
             print(error)
             break
 
-        except Exception:
-            print("\n")
+        # except Exception:
+        #     print("\n")
 
 
 class Exit(Exception):
+    def __init__(self, message):
+        super().__init__(message)
+
+
+class GeocoderNotFound(Exception):
+    def __int__(self, message):
+        super().__init__(message)
+
+
+class GeocoderServerError(Exception):
+    def __int__(self, message):
+        super().__init__(message)
+
+
+class HttpStatusNotFound(Exception):
+    def __init__(self, message):
+        super().__init__(message)
+
+
+class HttpStatusServerError(Exception):
+    def __init__(self, message):
+        super().__init__(message)
+
+
+class ConnectionError(Exception):
+    def __init__(self, message):
+        super().__init__(message)
+
+
+class VeryBadError(Exception):
     def __init__(self, message):
         super().__init__(message)
 
