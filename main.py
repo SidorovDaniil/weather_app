@@ -46,17 +46,17 @@ def get_weather_data_for_city(city: str) -> dict[str: any]:
         return response.json()
 
     except requests.exceptions.HTTPError:
-        if response.status_code == HTTPStatus.NOT_FOUND:
-            raise HttpStatusNotFound('Города, в котором вы находитесь, нет в базе')
+        if response.status_code == HTTPStatus.NOT_FOUND or response.status_code == HTTPStatus.BAD_REQUEST:
+            raise HttpStatusNotFound('Данного города нет в базе\n')
 
         elif response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR:
-            raise HttpStatusServerError('Ошибка со стороны сервера, попробуйте позже')
+            raise HttpStatusServerError('Ошибка со стороны сервера, попробуйте позже\n')
 
     except requests.exceptions.ConnectionError:
-        raise ConnectionError('Ошибка соединения')
+        raise RequestConnectionError('Ошибка соединения\n')
 
     except requests.exceptions.RequestException:
-        raise VeryBadError("Что-то пошло не так, попробуйте позже")
+        raise VeryBadError("Что-то пошло не так, попробуйте позже\n")
 
 
 def get_user_city() -> str:
@@ -72,10 +72,13 @@ def get_user_city() -> str:
         return location.city
 
     elif location.status_code == 404:
-        raise GeocoderNotFound('Не удалось определить ваше местоположение')
+        raise GeocoderNotFound('Не удалось определить ваше местоположение\n')
 
     elif location.status_code == 500:
-        raise GeocoderServerError('Ошибка при получении данных о вашем местоположении со стороны сервера')
+        raise GeocoderServerError('Ошибка при получении данных о вашем местоположении со стороны сервера\n')
+
+    else:
+        raise VeryBadError('Что-то пошло не так, попробуйте позже\n')
 
 
 def get_time(timestamp, timezone_seconds) -> str:
@@ -235,7 +238,7 @@ def action(user_input: int) -> None:
             print(weather_report(weather_data))
 
         except requests.exceptions.Timeout:
-            print("Превышено время ожидания ответа, попробуйте позже")
+            print("Превышено время ожидания ответа, попробуйте позже\n")
 
         except GeocoderNotFound as error:
             print(error)
@@ -249,7 +252,7 @@ def action(user_input: int) -> None:
         except HttpStatusServerError as error:
             print(error)
 
-        except ConnectionError as error:
+        except RequestConnectionError as error:
             print(error)
 
         except VeryBadError as error:
@@ -266,7 +269,7 @@ def action(user_input: int) -> None:
             print(weather_report(weather_data))
 
         except requests.exceptions.Timeout:
-            print("Превышено время ожидания ответа, попробуйте позже")
+            print("Превышено время ожидания ответа, попробуйте позже\n")
 
         except HttpStatusNotFound as error:
             print(error)
@@ -274,7 +277,7 @@ def action(user_input: int) -> None:
         except HttpStatusServerError as error:
             print(error)
 
-        except ConnectionError as error:
+        except RequestConnectionError as error:
             print(error)
 
         except VeryBadError as error:
@@ -318,9 +321,6 @@ def interface() -> None:
             print(error)
             break
 
-        # except Exception:
-        #     print("\n")
-
 
 class Exit(Exception):
     def __init__(self, message):
@@ -347,7 +347,7 @@ class HttpStatusServerError(Exception):
         super().__init__(message)
 
 
-class ConnectionError(Exception):
+class RequestConnectionError(Exception):
     def __init__(self, message):
         super().__init__(message)
 
